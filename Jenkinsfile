@@ -1,4 +1,3 @@
-
 stage('Test EC2 Credential') {
     steps {
         withCredentials([
