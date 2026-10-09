@@ -9,7 +9,6 @@ pipeline {
 
     environment {
         EC2_HOST = '172.31.20.54'
-        EC2_USER = 'ubuntu'
     }
 
     stages {
@@ -22,22 +21,32 @@ pipeline {
 
         stage('Deploy index.html') {
             steps {
-                sshagent(credentials: ['ec2-deploy-key']) {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'ec2-deploy-key',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    )
+                ]) {
                     sh '''
                         set -eu
 
-                        scp -o StrictHostKeyChecking=yes \
+                        scp -i "$SSH_KEY" \
+                            -o IdentitiesOnly=yes \
+                            -o StrictHostKeyChecking=yes \
                             index.html \
-                            "$EC2_USER@$EC2_HOST:/tmp/index.html"
+                            "$SSH_USER@$EC2_HOST:/tmp/index.html"
 
-                        ssh -o StrictHostKeyChecking=yes \
-                            "$EC2_USER@$EC2_HOST" \
+                        ssh -i "$SSH_KEY" \
+                            -o IdentitiesOnly=yes \
+                            -o StrictHostKeyChecking=yes \
+                            "$SSH_USER@$EC2_HOST" \
                             'sudo -n /usr/bin/install -o root -g root -m 644 /tmp/index.html /var/www/html/index.html &&
                              sudo -n /usr/sbin/nginx -t &&
                              sudo -n /usr/bin/systemctl reload nginx &&
                              rm -f /tmp/index.html'
 
-                        echo "Deployment completed successfully"
+                        echo "Deployment successful"
                     '''
                 }
             }
@@ -49,7 +58,7 @@ pipeline {
             echo 'SUCCESS: index.html deployed to EC2'
         }
         failure {
-            echo 'FAILED: Check Console Output for the error'
+            echo 'FAILED: Check Console Output'
         }
     }
 }
